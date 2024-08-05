@@ -1,0 +1,225 @@
+from kivy.lang import Builder
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivymd.app import MDApp
+from kivymd.uix.list import OneLineListItem
+from kivymd.uix.label import MDLabel
+from kivymd.uix.boxlayout import MDBoxLayout
+from kivymd.uix.navigationdrawer import MDNavigationDrawer
+from kivymd.uix.toolbar import MDTopAppBar
+from kivymd.uix.dialog import MDDialog
+from kivymd.uix.button import MDFlatButton
+from kivymd.uix.textfield import MDTextField
+import mysql.connector
+from kivy.uix.button import Button
+from kivymd.uix.slider import MDSlider
+from kivymd.uix.button import MDRoundFlatIconButton
+from kivymd.uix.datatables import MDDataTable
+
+
+
+class ContentNavigationDrawer(MDBoxLayout):
+    pass
+
+class LoginScreen(Screen):
+    pass
+class MainScreen(Screen):
+    pass
+
+class RangeOfMotionScreen(Screen):
+    pass
+
+class SequencesScreen(Screen):
+    pass
+
+class StartScreen(Screen):
+     def on_enter(self):
+        app = MainApp.get_running_app()
+         # Cargar rutinas del usuario actual
+
+class SliderButton(MDBoxLayout):
+    def on_slider_speed_change(self, instance, value):
+        print(f"El valor de velocidad del slider es: {value}")
+    def on_slider_series_change(self, instance, value):
+        print(f"El valor de series del slider es:{value}")
+    def on_slider_repetition_change(self,instance, value):
+        print(f"El valor de repeticiones del slider es:{value}")
+    
+
+    def on_open_close_switch(self,instance,value):
+        self.ids.dedo_dedo.disabled = value
+        self.ids.custom_routine.disabled = value
+        self.update_movimiento()
+    def on_dedo_dedo_switch(self,instance,value):
+        self.ids.open_close.disabled = value
+        self.ids.custom_routine.disabled = value
+        self.update_movimiento()
+    def on_custom_routine_switch(self, instance, value):
+        self.ids.th.disabled = not value
+        self.ids.ind.disabled = not value
+        self.ids.mid.disabled = not value
+        self.ids.ri.disabled = not value
+        self.ids.lt.disabled = not value
+        self.ids.open_close.disabled = value
+        self.ids.dedo_dedo.disabled = value
+        self.update_movimiento()
+
+    def update_movimiento(self):
+        # Verifica si al menos uno de los switches está activado
+        app = MainApp.get_running_app()
+        if self.ids.open_close.active or self.ids.dedo_dedo.active or self.ids.custom_routine.active:
+            app.movimiento = 1 if self.ids.open_close.active else 2 if self.ids.dedo_dedo.active else 3
+        else:
+            app.movimiento = 0  # Ninguno activado
+
+class MainApp(MDApp):
+    user_name = "default user"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.movimiento = 0  # Initialize movimiento attribute
+
+    def build(self):
+        self.theme_cls.primary_palette = "Blue"
+        self.dialog = None
+
+    def on_start(self):
+        try:
+            self.connection = mysql.connector.connect(
+                host='smecatronicos.com',
+                user='smecatr2_equipo1',
+                password='k|,r[l:U`7MG',
+                database='smecatr2_equipo1'
+            )
+            print("Conexión exitosa a la base de datos")
+        except mysql.connector.Error as err:
+            print("Error de conexión a la base de datos:")
+            self.show_error_dialog("Error de conexión a la base de datos")
+    
+    def log_in(self,username,password):
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute('SELECT * FROM users WHERE username = %s', (username,))
+            user = cursor.fetchone()
+
+            if user and user[2] == password: 
+                self.user_name = username
+                self.user_id = user[0]
+                self.password = user[2]
+                self.root.ids.main_screen.ids.user_label.text = "Usuario: " + self.user_name 
+                print("Inicio de sesión exitoso")
+                self.root.ids.screen_manager.current = "main" 
+            else:
+                self.show_error_dialog("Contraseña o usuario incorrecto, si no tiene una cuenta debe registrarse")
+            
+        except mysql.connector.Error as err:
+            self.show_error_dialog(f"Error de conexión a la base de datos: {err}")
+
+    def sign_in(self,username,password):
+        try:
+            cursor=self.connection.cursor()
+            sql = "INSERT INTO users (username, password) VALUES (%s, %s)"
+            values = (username, password)
+            cursor.execute(sql, values)
+            self.connection.commit()
+            self.show_confirmation_dialog("Registro exitoso, ya puede iniciar sesion")
+            cursor.close()
+        except mysql.connector.Error as err:
+             self.show_error_dialog(f"Error al realizar registro, intente de nuevo {err}")
+
+    def show_error_dialog(self, message):
+        if not self.dialog:
+            self.dialog = MDDialog(
+                text=message,
+                buttons=[
+                    MDFlatButton(
+                        text="CERRAR",
+                        on_release=lambda _: self.dialog.dismiss()
+                    )
+                ],
+            )
+        self.dialog.text = message
+        self.dialog.open()
+
+    def show_confirmation_dialog(self, message):
+        if not self.dialog:
+            self.dialog = MDDialog(
+                text=message,
+                buttons=[
+                    MDFlatButton(
+                        text="OK",
+                        on_release=lambda _: self.dialog.dismiss()
+                    )
+                ],
+            )
+        self.dialog.text = message
+        self.dialog.open()
+
+    def show_user_dialog(self):
+        if not self.dialog:
+            content = MDBoxLayout(
+                orientation='vertical',
+                spacing='12dp',
+                size_hint_y=None,
+                height="120dp"
+            )
+            self.username_field = MDTextField(
+                hint_text="Nombre de Usuario",
+                text=""
+            )
+            self.password_field = MDTextField(
+                hint_text="Contraseña",
+                password=True
+            )
+            content.add_widget(self.username_field)
+            content.add_widget(self.password_field)
+            
+            self.dialog = MDDialog(
+                title="Cambiar Usuario",
+                type="custom",
+                content_cls=content,
+                buttons=[
+                    MDFlatButton(
+                        text="CANCELAR",
+                        on_release=self.close_dialog
+                    ),
+                    MDFlatButton(
+                        text="INGRESAR",
+                        on_press=self.close_dialog ,
+                        on_release=lambda x: self.log_in(self.username_field.text, self.password_field.text)
+                    ),
+                ],
+            )
+        self.dialog.open()
+
+    def close_dialog(self, obj):
+        self.dialog.dismiss()
+
+    def rts(self,velocidad,series,repeticiones,thumb,index,middle,ring,little):
+        if not (velocidad and series and repeticiones) or self.movimiento == 0:
+            self.show_error_dialog("El numero de velocidad, series, repeticiones no puede ser cero o debe seleccionar algun movimiento")
+        elif self.movimiento == 3:
+            cursor = self.connection.cursor()
+            sql = "INSERT INTO Custom_routines (user_id, velocidad, series, repeticiones, movimiento,thumb,`index`,middle,ring,little) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+            values = (self.user_id, velocidad, series, repeticiones, self.movimiento,int(thumb),int(index),int(middle),int(ring),int(little))
+            print(thumb),print(index),print(middle),print(ring),print(little)
+            cursor.execute(sql, values)
+            self.connection.commit()
+            cursor.close()
+            self.show_confirmation_dialog("Se ha añadido una nueva rutina, vaya a la seccion Empezar para iniciar a utilizarla")
+            print("Datos insertados correctamente")
+        else:
+                try:
+                    cursor = self.connection.cursor()
+                    sql = "INSERT INTO routines (user_id, velocidad, series, repeticiones, movimiento) VALUES (%s, %s, %s, %s, %s)"
+                    values = (self.user_id, velocidad, series, repeticiones, self.movimiento)
+                    print(thumb),print(index),print(middle),print(ring),print(little)
+                    cursor.execute(sql, values)
+                    self.connection.commit()
+                    cursor.close()
+                    self.show_confirmation_dialog("Se ha añadido una nueva rutina, vaya a la seccion Empezar para iniciar a utilizarla")
+                    print("Datos insertados correctamente")
+                except mysql.connector.Error as err:
+                    print(f"Error al insertar datos: {err}")
+
+if __name__=="__main__":
+    MainApp().run()
